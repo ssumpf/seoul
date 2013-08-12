@@ -26,6 +26,20 @@
 
 #include <nul/compiler.h>
 
+BEGIN_EXTERN_C
+#ifdef __MMX__
+#include <mmintrin.h>
+#endif
+
+#ifdef __SSE2__
+#include <emmintrin.h>
+#endif
+
+#ifdef __SSSE3__
+#include <tmmintrin.h>
+#endif
+END_EXTERN_C
+
 /* Constant-width integer types. */
 typedef genode_uint64_t  uint64;
 typedef genode_uint32_t  uint32;
