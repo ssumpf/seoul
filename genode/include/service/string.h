@@ -43,7 +43,7 @@ size_t strnlen(const char *src, size_t maxlen);
 size_t strlen(const char *src);
 char * strcpy(char *dst, const char *src);
 char * strstr(char const *haystack, char const *needle);
-unsigned long strtoul(const char *nptr, const char **endptr, int base);
+unsigned long strtoul(const char *nptr, char **endptr, int base);
 const char * strchr(const char *s, int c);
 
 int strcmp(const char *dst, const char *src);
