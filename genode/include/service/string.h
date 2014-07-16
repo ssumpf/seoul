@@ -28,7 +28,7 @@
  * Memory functions.
  ************************************************************************/
 
-BEGIN_EXTERN_C
+VMM_BEGIN_EXTERN_C
 
 void * memcpy(void *dst, const void *src, size_t count);
 void * memmove(void *dst, const void *src, size_t count);
@@ -51,7 +51,7 @@ int strncmp(const char *dst, const char *src, size_t size);
 int strspn(const char *s, const char *accept);
 int strcspn(const char *s, const char *reject);
 
-END_EXTERN_C
+VMM_END_EXTERN_C
 
 /* add NOVA specific includes */
 #include <sys/desc.h>

@@ -26,7 +26,7 @@
 
 #include <nul/compiler.h>
 
-BEGIN_EXTERN_C
+VMM_BEGIN_EXTERN_C
 #ifdef __MMX__
 #include <mmintrin.h>
 #endif
@@ -38,7 +38,7 @@ BEGIN_EXTERN_C
 #ifdef __SSSE3__
 #include <tmmintrin.h>
 #endif
-END_EXTERN_C
+VMM_END_EXTERN_C
 
 /* Constant-width integer types. */
 typedef genode_uint64_t  uint64;

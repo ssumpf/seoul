@@ -159,7 +159,7 @@ struct Utcb
    * because no space is left. If this is not zero, the caller has to
    * handle this case! See sigma0.cc map_self for inspiration.
    */
-  WARN_UNUSED
+  VMM_WARN_UNUSED
   unsigned long add_mappings(unsigned long addr, unsigned long size, unsigned long hotspot, unsigned rights,
                              bool frame = false, unsigned max_items = sizeof(msg) / sizeof(msg[0]) / 2)
   {

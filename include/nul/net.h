@@ -22,7 +22,7 @@
 #include <nul/types.h>
 #include <nul/compiler.h>
 
-struct ALIGNED(16)  tx_desc {
+struct VMM_ALIGNED(16)  tx_desc {
   enum {
     DTYP_CONTEXT = 2U,
     DTYP_DATA    = 3U,

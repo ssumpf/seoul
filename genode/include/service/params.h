@@ -58,3 +58,5 @@ class Parameter : public Genode::Fifo<Parameter>::Element {
 #define PARAM_ITER(p)                                               \
   Parameter ** p; Parameter * pp;                                    \
   for (pp = Parameter::all_parameters().dequeue(), p = &pp; !Parameter::all_parameters().empty(); pp = Parameter::all_parameters().dequeue(), p = &pp)
+
+#define PARAM_DEREF(p) (*(*(p)))

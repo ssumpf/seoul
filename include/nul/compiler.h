@@ -27,6 +27,9 @@
 /* We can use [[ noreturn ]] here, when we all move to C++ 11. */
 #define VMM_NORETURN   __attribute__((noreturn))
 #define VMM_UNUSED     __attribute__((unused))
+#define VMM_ALIGNED(X) __attribute__((aligned(X)))
+#define VMM_WARN_UNUSED __attribute__((warn_unused_result))
+
 
 #ifdef __cplusplus
 # define VMM_BEGIN_EXTERN_C extern "C" {

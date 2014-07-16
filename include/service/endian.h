@@ -24,8 +24,8 @@
 namespace Endian {
 
 #if defined(__i386__) || defined(__x86_64__)
-  static inline uint16 hton16(uint16 value) { return __builtin_bswap16(value); }
-  static inline uint16 ntoh16(uint16 value) { return __builtin_bswap16(value); }
+  static inline uint16 hton16(uint16 value) { asm ("xchg %b0, %h0" : "+Q"(value)); return value; }
+  static inline uint16 ntoh16(uint16 value) { asm ("xchg %b0, %h0" : "+Q"(value)); return value; }
   static inline uint32 hton32(uint32 value) { return __builtin_bswap32(value); }
   static inline uint32 ntoh32(uint32 value) { return __builtin_bswap32(value); }
   static inline uint64 hton64(uint64 value) { return __builtin_bswap64(value); }
