@@ -72,11 +72,11 @@ PARAM_HANDLER(mio,
     size = Cpu::bsr(argv[1] | 1);
 
 
-  MessageHostOp msg(MessageHostOp::OP_ALLOC_IOMEM, argv[0], 1 << size);
+  MessageHostOp msg(MessageHostOp::OP_ALLOC_IOMEM, argv[0], 1UL << size);
   if (!mb.bus_hostop.send(msg) || !msg.ptr)
     Logging::panic("can not map IOMEM region %lx+%lx", msg.value, msg.len);
 
-  DirectMemDevice *dev = new DirectMemDevice(msg.ptr, dest, 1 << size);
+  DirectMemDevice *dev = new DirectMemDevice(msg.ptr, dest, 1UL << size);
   mb.bus_memregion.add(dev,  DirectMemDevice::receive_static<MessageMemRegion>);
   mb.bus_mem.add(dev,        DirectMemDevice::receive_static<MessageMem>);
 
