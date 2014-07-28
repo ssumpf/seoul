@@ -44,6 +44,7 @@ enum {
   MTD_INJ             = 1ul << 17,
   MTD_STATE           = 1ul << 18,
   MTD_TSC             = 1ul << 19,
+  MTD_EFER            = 1ul << 20,
   MTD_IRQ             = MTD_RFLAGS | MTD_STATE | MTD_INJ | MTD_TSC,
   MTD_ALL             = (~0U >> 12) & ~MTD_CTRL
 };

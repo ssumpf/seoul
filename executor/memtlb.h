@@ -87,7 +87,7 @@ private:
 	else if (features & FEATURE_PAE)
 	  {
 	    reserved_bit = (~_paging_mode & (1<<11) && (pte & (1ULL << 63)))
-	      || ((~features & FEATURE_LONG) && features & FEATURE_PAE && (static_cast<unsigned long long>(pte) >> 52) & 0xeff)
+	      || ((~features & FEATURE_LONG) && features & FEATURE_PAE && (static_cast<unsigned long long>(pte) >> 52) & 0x7ff)
 	      || (((static_cast<unsigned long long>(pte) & ~(1ULL << 63)) >> PHYS_ADDR_SIZE) || (is_sp && (pte >> 12) & ((1<<(l*9))-1)));
 	  }
 	if (reserved_bit)  PF(virt, type | 9);
@@ -112,6 +112,10 @@ private:
     else
       phys = pte >> size;
     phys = (phys << size) | (virt & ((1 << size) - 1));
+
+    // clear XD/NX bit on 64 bit host
+    if (features & FEATURE_PAE && sizeof(phys) == 8) phys &= ~(1ULL << 63);
+
     return _fault;
   }
 
@@ -145,7 +149,7 @@ protected:
 
 
   int init() {
-
+    _msr_efer = _cpu->efer;
     _paging_mode = (READ(cr0) & 0x80010000) | READ(cr4) & 0x30 | _msr_efer & 0xc00;
 
     // fetch pdpts in leagacy PAE mode

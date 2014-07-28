@@ -115,6 +115,9 @@ class VirtualCpu : public VCpu, public StaticReceiver<VirtualCpu>
     case 0x2ff:
       msg.cpu->edx_eax(0);
       break;
+    case 0xc0000080: // EFER
+      msg.cpu->edx_eax(msg.cpu->efer);
+      break;
     default:
       dprintf("unsupported rdmsr %x at %x\n",  msg.cpu->ecx, msg.cpu->eip);
       GP0(msg);
@@ -141,6 +144,10 @@ class VirtualCpu : public VCpu, public StaticReceiver<VirtualCpu>
 	(&cpu->sysenter_cs)[cpu->ecx - 0x174] = cpu->edx_eax();
 	msg.mtr_out |= MTD_SYSENTER;
 	break;
+    case 0xc0000080:
+        cpu->efer    = cpu->edx_eax();
+        msg.mtr_out |= MTD_EFER;
+        break;
       default:
 	dprintf("unsupported wrmsr %x <-(%x:%x) at %x\n",  cpu->ecx, cpu->edx, cpu->eax, cpu->eip);
 	GP0(msg);
@@ -548,6 +555,7 @@ VMM_REGSET(CPUID,
        VMM_REG_RW(CPUID_EDXb,  0xb3, 0, ~0u,)
        VMM_REG_RW(CPUID_EAX80, 0x80000000, 0x80000004, ~0u,)
        VMM_REG_RW(CPUID_ECX81, 0x80000012, 0x100000, ~0u,)
+       VMM_REG_RW(CPUID_EDX81, 0x80000013, 0, ~0u,)
        VMM_REG_RW(CPUID_EAX82, 0x80000020, 0, ~0u,)
        VMM_REG_RW(CPUID_EBX82, 0x80000021, 0, ~0u,)
        VMM_REG_RW(CPUID_ECX82, 0x80000022, 0, ~0u,)

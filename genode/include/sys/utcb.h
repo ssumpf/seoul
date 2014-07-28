@@ -97,7 +97,7 @@ struct Utcb
       mword    cr0, cr2, cr3, cr4;
 #ifdef __x86_64__
       mword        cr8;
-      mword        : 64;          // reserved
+      mword        efer;          // reserved
 #endif
       mword     dr7, sysenter_cs, sysenter_esp, sysenter_eip;
       Descriptor   es, cs, ss, ds, fs, gs;
