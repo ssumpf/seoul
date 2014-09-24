@@ -245,7 +245,7 @@ public:
     switch(msg.irq) {
     case 0x09:  return handle_int09(msg.cpu);
     case 0x16:  return handle_int16(msg);
-    case RESET_VECTOR:
+    case BIOS_RESET_VECTOR:
       {
 	MessageLegacy msg2(MessageLegacy::RESET);
 	_hostmb->bus_legacy.send(msg2);

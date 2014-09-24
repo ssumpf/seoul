@@ -20,19 +20,20 @@
 
 #define DEBUG(cpu)   Logging::printf("\t%s eax %x ebx %x ecx %x edx %x eip %x efl %x\n", __func__, cpu->eax, cpu->ebx, cpu->ecx, cpu->edx, cpu->eip, cpu->efl)
 
+#define BIOS_BASE 0xf0000
+
+
 class BiosCommon : public DiscoveryHelper<BiosCommon>
 {
 public:
   Motherboard &_mb;
 
   enum {
-    RESET_VECTOR = 0x100,
-    MAX_VECTOR
+    BIOS_RESET_VECTOR = 0x100,
+    BIOS_MAX_VECTOR
   };
 
 protected:
-#include "model/simplemem.h"
-
 
   /**
    * Write bios data helper.
@@ -40,7 +41,11 @@ protected:
   void write_bda(unsigned short offset, unsigned value, size_t len)
   {
     assert(len <= sizeof(value));
-    copy_out(0x400 + offset, &value, len);
+    unsigned x = read_bda(offset);
+    Cpu::move(&x, &value, len >> 1);
+
+    MessageMem msg(false, 0x400 + offset, &x);
+    _mb.bus_mem.send(msg);
   }
 
 
@@ -50,7 +55,8 @@ protected:
   unsigned read_bda(size_t offset)
   {
     unsigned res;
-    copy_in(0x400 + offset, &res, sizeof(res));
+    MessageMem msg(true, 0x400 + offset, &res);
+    _mb.bus_mem.send(msg);
     return res;
   }
 
@@ -60,7 +66,7 @@ protected:
   bool jmp_int(MessageBios &msg, unsigned char number)
   {
     unsigned short v[2];
-    copy_in(number*4, v, 4);
+    if (!msg.vcpu->copy_in(number*4, v, 4)) return false;
 
     msg.cpu->cs.sel  = v[1];
     msg.cpu->cs.base = v[1] << 4;
@@ -68,13 +74,6 @@ protected:
     msg.mtr_out |= MTD_RIP_LEN | MTD_CS_SS;
     return true;
   }
-
-  bool jmp_hlt(MessageBios &msg)
-  {
-    msg.cpu->eip--;
-    return true;
-  }
-
 
   /**
    * Set the usual error indication.
@@ -96,5 +95,5 @@ protected:
     _mb.bus_ioout.send(msg);
   }
 
- BiosCommon(Motherboard &mb) : _mb(mb), _bus_memregion(&mb.bus_memregion), _bus_mem(&mb.bus_mem) {}
+ BiosCommon(Motherboard &mb) : _mb(mb) {}
 };

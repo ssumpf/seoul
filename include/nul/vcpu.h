@@ -23,6 +23,14 @@
 #include "executor/cpustate.h"
 #include "message.h"
 
+/**
+ * The size in bytes of the VCPU parameters.
+ *
+ * We need 5 (register-in, param-in, param-out, register-out, empty).
+ */
+#define SIZEOF_VCPU_PARAMETER  12
+#define NUM_VCPU_PARAMETER     5
+
 struct CpuMessage {
   enum Type {
     TYPE_CPUID_WRITE,
@@ -130,6 +138,129 @@ public:
     EVENT_HOST   = 1 << 20,
     EVENT_RESUME = 1 << 21
   };
+
+  struct GuestPtr {
+    unsigned short seg;
+    unsigned short ofs;
+  };
+  // the parameters for the copy-in and out loop
+  struct Parameter {
+    volatile unsigned short count;
+    struct GuestPtr src;
+    struct GuestPtr dst;
+    unsigned short dummy;  // align the whole structure to dwords
+  };
+
+  // the shared-memory area
+  union {
+    struct Parameter params[NUM_VCPU_PARAMETER];
+    char bytes[4096];
+  } shmem;
+  unsigned params_used;
+
+  /**
+   * Return a pointer on the free part of the shmem area.
+   */
+  unsigned long get_shmem_ptr() {
+    unsigned long res = (shmem.params[0].dst.seg << 4)  + shmem.params[0].dst.ofs;
+    for (unsigned i=0; i < params_used; i++)  res += shmem.params[i].count;
+    return res;
+  }
+
+  /**
+   * Add a copy-in/out request to the parameters.
+   */
+  void add_param(unsigned long address, unsigned count, bool read) {
+    assert (params_used < (sizeof(shmem.params) / sizeof(Parameter)));
+    GuestPtr &src = read ? shmem.params[params_used].src : shmem.params[params_used].dst;
+    GuestPtr &dst = read ? shmem.params[params_used].dst : shmem.params[params_used].src;
+    shmem.params[params_used].count = count;
+    src.seg = address >> 4;
+    src.ofs = address - (src.seg << 4);
+    unsigned long shmem_ptr = get_shmem_ptr();
+    dst.seg = shmem_ptr >> 4;
+    dst.ofs = shmem_ptr - (dst.seg << 4);
+    params_used++;
+  }
+
+  /**
+   * Check whether some copyin-parameters are already available and change address accordingly.  Add a copy-in/out
+   * request otherwise.
+   */
+  bool check_params(unsigned long &address, unsigned count, bool read) {
+    if (!params_used)
+      return true;
+    if (read) {
+      for (unsigned i=0; i < params_used; i++)
+	if (address == ((shmem.params[i].src.seg << 4) + shmem.params[i].src.ofs) && shmem.params[i].count == count) {
+	  address = (shmem.params[i].dst.seg << 4) + shmem.params[i].dst.ofs;
+	  return true;
+	}
+      add_param(address, count, true);
+      return false;
+    }
+    else {
+      unsigned long naddress = get_shmem_ptr();
+      add_param(address, count, false);
+      address = naddress;
+      return true;
+    }
+  }
+
+  /**
+   * Make VCPU-local guest memory available to a model.  This includes the LAPIC and the Shmem-BIOS area.
+   */
+  bool copy_inout(unsigned long address, void *ptr, unsigned count, bool read)
+  {
+//    Logging::printf("copy_%s(%lx, %x) %d\n", read ? "in" : "out", address, count, params_used);
+    if (!check_params(address, count, read)) return false;
+
+    MessageMemRegion msg(address >> 12);
+    if (!memregion.send(msg) || !msg.ptr || ((address + count) > ((msg.start_page + msg.count) << 12))) {
+      char *p = reinterpret_cast<char *>(ptr);
+
+      if (address & 3) {
+	unsigned value;
+	MessageMem msg(true, address & ~3, &value);
+	if (!mem.send(msg, true)) return false;
+	unsigned l = 4 - (address & 3);
+	if (l > count) l = count;
+	memcpy(reinterpret_cast<char *>(&value) + (address & 3), p, l);
+	if (!read) {
+	  msg.read = false;
+	  if (!mem.send(msg, true)) return false;
+	}
+	p       += l;
+	address += l;
+	count   -= l;
+      }
+      while (count >= 4) {
+	MessageMem msg(false, address, reinterpret_cast<unsigned *>(p));
+	if (!mem.send(msg, read)) return false;
+	address += 4;
+	p       += 4;
+	count   -= 4;
+      }
+      if (count) {
+	unsigned value;
+	MessageMem msg(true, address, &value);
+	if (!mem.send(msg, true)) return false;
+	memcpy(&value, p, count);
+	if (!read) {
+	  msg.read = false;
+	  if (!mem.send(msg, true)) return false;
+	}
+      }
+      return true;
+    }
+    if (read)
+      memcpy(ptr, msg.ptr + (address - (msg.start_page << 12)), count);
+    else
+      memcpy(msg.ptr + (address - (msg.start_page << 12)), ptr, count);
+    return true;
+  }
+  bool copy_in(unsigned long address, void *ptr, unsigned count)  { return copy_inout(address, ptr, count, true);  }
+  bool copy_out(unsigned long address, void *ptr, unsigned count) { return copy_inout(address, ptr, count, false); }
 
   unsigned long long inj_count;
   VCpu (VCpu *last) : _last(last), inj_count(0) {}

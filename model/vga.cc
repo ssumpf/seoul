@@ -107,6 +107,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
       {
 	if (vesa_mode == info->_vesa_mode)
 	  {
+
 	    // fix memory info
 	    size_t image_size = info->bytes_per_scanline * info->resolution[1];
 	    if (!image_size || image_size > _framebuffer_size)
@@ -125,7 +126,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
     return ~0u;
   }
 
-  bool  handle_vesa(CpuState *cpu)
+  bool  handle_vesa(MessageBios &msg, CpuState *cpu)
   {
     static const char *oemstring = "Vancouver VESA BIOS";
     switch (cpu->ax)
@@ -137,7 +138,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
 	  memset(&v, 0, sizeof(v));
 
 	  // copy in the tag
-	  copy_in(cpu->es.base + cpu->di, &v, 4);
+	  if (!msg.vcpu->copy_in(cpu->es.base + cpu->di, &v, 4)) return false;
 	  Logging::printf("VESA %x tag %x base %zx+%x esi %x\n", cpu->eax, v.tag, size_t(cpu->es.base), cpu->di, cpu->esi);
 
 	  // we support VBE 2.0
@@ -162,7 +163,8 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
 	  v.memory = _framebuffer_size >> 16;
 	  size_t copy_size = (v.tag == Vbe::TAG_VBE2) ? sizeof(v) : 256;
 	  v.tag = Vbe::TAG_VESA;
-	  copy_out(cpu->es.base + cpu->di, &v, copy_size);
+	  msg.vcpu->copy_out(cpu->es.base + cpu->di, &v, copy_size);
+          cpu->ax = 0x004f;
 	}
 	break;
       case 0x4f01: // get modeinfo
@@ -171,7 +173,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
 	  if (get_vesa_mode(cpu->ecx & 0x0fff, &info) != ~0u)
 	    {
 	      info.phys_base = _framebuffer_phys;
-	      copy_out(cpu->es.base + cpu->di, &info, sizeof(info));
+	      msg.vcpu->copy_out(cpu->es.base + cpu->di, &info, sizeof(info));
 	      break;
 	    }
 	}
@@ -180,7 +182,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
       case 0x4f02: // set vbemode
 	{
 	  ConsoleModeInfo info;
-      _last_videomode_request = cpu->ebx;
+	  _last_videomode_request = cpu->ebx;
 	  unsigned index = get_vesa_mode(cpu->ebx & 0x0fff, &info);
 	  if (index != ~0u && info.attr & 1)
 	    {
@@ -347,8 +349,7 @@ class Vga : public StaticReceiver<Vga>, public BiosCommon
 	    // unsupported
 	    break;
 	  default:
-	    if (!handle_vesa(cpu))
-	      DEBUG(cpu);
+	    return handle_vesa(msg, cpu);
 	  }
       }
     //DEBUG(cpu);
@@ -369,7 +370,7 @@ public:
     switch(msg.irq)
       {
       case 0x10: return handle_int10(msg);
-      case RESET_VECTOR: return handle_reset(true);
+      case BIOS_RESET_VECTOR: return handle_reset(true);
       default:
 	return false;
       }

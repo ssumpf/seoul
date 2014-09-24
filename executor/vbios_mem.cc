@@ -101,7 +101,7 @@ class VirtualBiosMem : public StaticReceiver<VirtualBiosMem>, public BiosCommon
 
 	      if (mmap.type)
 		{
-		  copy_out(cpu->es.base + cpu->di, &mmap, 20);
+		  msg.vcpu->copy_out(cpu->es.base + cpu->di, &mmap, 20);
 		  cpu->eax = cpu->edx;
 		  cpu->ecx = 20;
 		  cpu->edx = 0;

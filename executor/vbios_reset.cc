@@ -40,7 +40,7 @@ class VirtualBiosReset : public StaticReceiver<VirtualBiosReset>, public BiosCom
 {
   enum {
     MAX_RESOURCES = 32,
-    SIZE_EBDA_KB  = 5,
+    SIZE_EBDA_KB  = 8,
     /**
      * EBDA Layout
      * 0x0000 - 0x0200 compatible EBDA
@@ -101,7 +101,11 @@ class VirtualBiosReset : public StaticReceiver<VirtualBiosReset>, public BiosCom
     }
 
 
-    if (!bsp) return jmp_hlt(msg);
+    if (!bsp) {
+      CpuEvent msg3(VCpu::EVENT_INIT);
+      vcpu->bus_event.send(msg3, true);
+      return true;
+    }
 
     // we are a BSP and init the platform
 
@@ -138,7 +142,6 @@ class VirtualBiosReset : public StaticReceiver<VirtualBiosReset>, public BiosCom
     check1(false, !_mb.bus_memregion.send(msg3) || !msg3.ptr || !msg3.count, "no low memory available");
 
     // were we start to allocate stuff
-    _mem_ptr = msg3.ptr;
     _mem_size = msg3.count << 12;
 
     // we use the lower 640k of memory
@@ -226,6 +229,10 @@ class VirtualBiosReset : public StaticReceiver<VirtualBiosReset>, public BiosCom
       discovery_write_dw("bda", 0xe, ebda >> 4, 2);
       discovery_write_dw(name, 0, SIZE_EBDA_KB, 1);
     }
+    else if (!strcmp("reset", name))
+      _resources[index] = Resource(name, BIOS_BASE + 0xfff0, 0x10, false);
+    else if (!strcmp("bios", name))
+      _resources[index] = Resource(name, BIOS_BASE, 0x1000, false);
     else if (!strcmp("RSDP", name)) {
       Resource *r;
       check1(false, !(r = get_resource("ebda")));
@@ -286,9 +293,24 @@ class VirtualBiosReset : public StaticReceiver<VirtualBiosReset>, public BiosCom
 
 public:
 
+
+  bool receive(MessageLegacy &msg) {
+     if (msg.type != MessageLegacy::RESET) return false;
+
+     // jump to the reset helper
+     discovery_write_dw("reset", 0, 0xea, 1);
+     discovery_write_dw("reset", 1, BIOS_RESET_VECTOR, 2);
+     discovery_write_dw("reset", 3, BIOS_BASE >> 4, 2);
+
+     // the BIOS release date
+     discovery_write_st("reset", 5, "01/01/08", 8);
+    return false;
+  }
+
+
   bool  receive(MessageBios &msg) {
     switch(msg.irq) {
-    case RESET_VECTOR:
+    case BIOS_RESET_VECTOR:
       return reset_helper(msg);
     case 0x18:
       Logging::printf("INT18 - new try\n");
@@ -338,8 +360,21 @@ public:
     return true;
   }
 
+  bool receive(MessageMem &msg) {
+    if (!msg.read || !in_range(msg.phys, BIOS_BASE, 0x10000)) return false;
+    /* give read only access to bios area */
+    Cpu::move<2>(msg.ptr, _mem_ptr + msg.phys);
+    return true;
+  }
 
-  VirtualBiosReset(Motherboard &mb) : BiosCommon(mb), _mem_ptr(), _mem_size(), _resources() {}
+  VirtualBiosReset(Motherboard &mb) : BiosCommon(mb), _mem_size(), _resources() {
+    MessageMemRegion msg3(0);
+    if (!_mb.bus_memregion.send(msg3) || !msg3.ptr)
+      Logging::panic("no low memory available");
+
+    // were we start to allocate stuff
+    _mem_ptr = msg3.ptr;
+  }
 };
 
 PARAM_HANDLER(vbios_reset,
@@ -347,5 +382,7 @@ PARAM_HANDLER(vbios_reset,
 {
   VirtualBiosReset * dev = new VirtualBiosReset(mb);
   mb.bus_bios.add(dev,      VirtualBiosReset::receive_static<MessageBios>);
+  mb.bus_legacy.add(dev,    VirtualBiosReset::receive_static<MessageLegacy>);
   mb.bus_discovery.add(dev, VirtualBiosReset::receive_static<MessageDiscovery>);
+  mb.bus_mem.add(dev,       VirtualBiosReset::receive_static<MessageMem>);
 }

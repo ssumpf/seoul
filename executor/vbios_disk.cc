@@ -107,7 +107,7 @@ class VirtualBiosDisk : public StaticReceiver<VirtualBiosDisk>, public BiosCommo
     // we push a real-mode iret frame onto the users stack
     unsigned short frame[] = {0x7c00, 0x0000, 0x0202};
     msg.cpu->esp -= sizeof(frame);
-    copy_out(msg.cpu->esp, frame, sizeof(frame));
+    msg.vcpu->copy_out(msg.cpu->esp, frame, sizeof(frame));
 
     if (!disk_op(msg, 0, 0, 0x7c00, 1, false) or (msg.cpu->ah != 0))
       Logging::panic("VB: could not read MBR from boot disk");
@@ -196,7 +196,7 @@ class VirtualBiosDisk : public StaticReceiver<VirtualBiosDisk>, public BiosCommo
       case 0x43: // extended write
 	if (check_drive(msg, disk_nr))
 	  {
-	    copy_in(msg.cpu->ds.base + msg.cpu->si, &da, sizeof(da));
+	    if (!msg.vcpu->copy_in(msg.cpu->ds.base + msg.cpu->si, &da, sizeof(da))) return false;
 	    return disk_op(msg, disk_nr, da.block, (da.segment << 4) + da.offset, da.count, msg.cpu->ah & 1);
 	  }
 	break;
@@ -222,7 +222,7 @@ class VirtualBiosDisk : public StaticReceiver<VirtualBiosDisk>, public BiosCommo
 	    params.pcylinders = sectors;
 	    params.size = 0x1a;
 	    params.sectorsize = 512;
-	    copy_out(msg.cpu->ds.base + msg.cpu->si, &params, params.size);
+        msg.vcpu->copy_out(msg.cpu->ds.base + msg.cpu->si, &params, params.size);
 	    msg.cpu->ah = 0; // function supported
 	    Logging::printf("VB: driveparam[%d] size %x sectors %llx efl %x eax %x\n", disk_nr, params.size, params.sectors, msg.cpu->efl, msg.cpu->eax);
 	    //msg.cpu->head.res1 = 0x100;
